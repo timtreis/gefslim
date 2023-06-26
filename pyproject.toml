@@ -20,6 +20,8 @@ urls.Source = "https://github.com/timtreis/gefslim"
 urls.Home-page = "https://github.com/timtreis/gefslim"
 dependencies = [
     "anndata",
+    "h5py",
+    "pathlib",
     # for debug logging (referenced from the issue template)
     "session-info"
 ]

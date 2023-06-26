@@ -26,6 +26,16 @@ class GEF:
 
         return result
 
+    def get_area_per_cell(self) -> pd.DataFrame:
+        """Returns the size in pixel per cell."""
+        cellcut = self.read_cellcut().to_df()
+
+        result = pd.DataFrame()
+        result["cell_id"] = cellcut.index.tolist()
+        result["area"] = cellcut["area"].values
+
+        return result
+
     def get_cell_borders(self, transformed: bool = True) -> pd.DataFrame:
         """Returns the spatial information per cell."""
         cellcut = self.read_cellcut().to_df()

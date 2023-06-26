@@ -14,49 +14,82 @@ class GEF:
         self,
         result_dir: str,
     ) -> None:
+        """
+        Initialize GEF class.
+
+        Args:
+            result_dir (str): Directory where results are located.
+        """
         self.result_dir = Path(result_dir)
         self.data = {}
 
-    def get_counts_per_cell(self, name: str) -> pd.DataFrame:
-        """Returns the number of probes per cell."""
+    def _read_cellcut_to_df(self, name: str) -> pd.DataFrame:
+        """
+        Read cellcut and return as DataFrame.
+
+        Args:
+            name (str): File name.
+
+        Returns
+        -------
+            pd.DataFrame: DataFrame of cellcut data.
+        """
         cellcut = self.read_cellcut(name=name).to_df()
+        cellcut["cell_id"] = cellcut.index.tolist()
+        return cellcut
 
-        result = pd.DataFrame()
-        result["counts"] = cellcut[["geneCount"]]
-        result["cell_id"] = cellcut.index.tolist()
+    def get_counts_per_cell(self, name: str) -> pd.DataFrame:
+        """
+        Returns the number of probes per cell.
 
-        return result
+        Args:
+            name (str): File name.
+
+        Returns
+        -------
+            pd.DataFrame: DataFrame with cell_id and count of probes.
+        """
+        cellcut = self._read_cellcut_to_df(name)
+        return cellcut[["cell_id", "geneCount"]].rename(columns={"geneCount": "counts"})
 
     def get_area_per_cell(self, name: str) -> pd.DataFrame:
-        """Returns the size in pixel per cell."""
-        cellcut = self.read_cellcut(name=name).to_df()
+        """
+        Returns the size in pixel per cell.
 
-        result = pd.DataFrame()
-        result["cell_id"] = cellcut.index.tolist()
-        result["area"] = cellcut["area"].values
+        Args:
+            name (str): File name.
 
-        return result
+        Returns
+        -------
+            pd.DataFrame: DataFrame with cell_id and area.
+        """
+        cellcut = self._read_cellcut_to_df(name)
+        return cellcut[["cell_id", "area"]]
 
     def get_cell_borders(self, name: str, transformed: bool = True) -> pd.DataFrame:
-        """Returns the spatial information per cell."""
-        cellcut = self.read_cellcut(name=name).to_df()
+        """
+        Returns the spatial information per cell.
 
-        result = pd.DataFrame()
-        result["cell_id"] = cellcut.index.tolist()
-        result["x"] = cellcut["x"].values
-        result["y"] = cellcut["y"].values
-        result["border"] = cellcut["border"].values
+        Args:
+            name (str): File name.
+            transformed (bool, optional): If true, returns borders transformed. Defaults to True.
 
-        if not transformed:
-            return result
-        else:
-            result["border"] = result.apply(
-                lambda row: [[point[0] + row["x"], point[1] + row["y"]] for point in row["border"]], axis=1
+        Returns
+        -------
+            pd.DataFrame: DataFrame with cell_id and borders (and x,y if not transformed).
+        """
+        cellcut = self._read_cellcut_to_df(name)
+
+        if transformed:
+            cellcut["border"] = cellcut.apply(
+                lambda row: [[point[0] + row["x"], point[1] + row["y"]] for point in row["border"]]
+                if transformed
+                else row["border"],
+                axis=1,
             )
-            del result["x"]
-            del result["y"]
-
-            return result
+            return cellcut[["cell_id", "border"]]
+        else:
+            return cellcut[["cell_id", "x", "y", "border"]]
 
     def get_genecounts_per_cell(self, name: str) -> anndata.AnnData:
         """Returns the counts per gene per cell."""

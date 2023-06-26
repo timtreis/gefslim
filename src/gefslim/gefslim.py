@@ -8,115 +8,175 @@ from gefslim.utils import _get_h5_from_gef
 
 
 class GEF:
-    """Class that interacts with the .gef file."""
+    """
+    A class that provides methods for interacting with .gef files.
+
+    Attributes
+    ----------
+    result_dir : str
+        The directory where the .gef files are located.
+    data : dict
+        A dictionary that stores the loaded data from the .gef files.
+    """
 
     def __init__(
         self,
         result_dir: str,
     ) -> None:
         """
-        Initialize GEF class.
+        Initialize a GEF instance.
 
-        Args:
-            result_dir (str): Directory where results are located.
+        Parameters
+        ----------
+        result_dir : str
+            The directory where the .gef files are located.
         """
         self.result_dir = Path(result_dir)
         self.data = {}
 
     def _read_cellcut_to_df(self, name: str) -> pd.DataFrame:
         """
-        Read cellcut and return as DataFrame.
+        Convert a cellcut file to a pandas DataFrame.
 
-        Args:
-            name (str): File name.
+        Parameters
+        ----------
+        name : str
+            The name of the cellcut file to be read.
 
         Returns
         -------
-            pd.DataFrame: DataFrame of cellcut data.
+        pd.DataFrame
+            A DataFrame representation of the cellcut data with an
+            additional column "cell_id" for the original indices.
         """
-        cellcut = self.read_cellcut(name=name).to_df()
-        cellcut["cell_id"] = cellcut.index.tolist()
-        return cellcut
+        cellcut_df = self.read_cellcut(name=name).to_df()
+        cellcut_df["cell_id"] = cellcut_df.index
+        return cellcut_df
 
     def get_counts_per_cell(self, name: str) -> pd.DataFrame:
         """
-        Returns the number of probes per cell.
+        Retrieve the number of probes per cell from a cellcut file.
 
-        Args:
-            name (str): File name.
+        Parameters
+        ----------
+        name : str
+            The name of the cellcut file.
 
         Returns
         -------
-            pd.DataFrame: DataFrame with cell_id and count of probes.
+        pd.DataFrame
+            A DataFrame with 'cell_id' and 'counts' columns, where
+            'counts' represents the number of probes per cell. Returns
+            an empty DataFrame if an error occurs during the read operation.
         """
         cellcut = self._read_cellcut_to_df(name)
         return cellcut[["cell_id", "geneCount"]].rename(columns={"geneCount": "counts"})
 
     def get_area_per_cell(self, name: str) -> pd.DataFrame:
         """
-        Returns the size in pixel per cell.
+        Retrieve the size in pixels of each cell from a cellcut file.
 
-        Args:
-            name (str): File name.
+        Parameters
+        ----------
+        name : str
+            The name of the cellcut file.
 
         Returns
         -------
-            pd.DataFrame: DataFrame with cell_id and area.
+        pd.DataFrame
+            A DataFrame containing the 'cell_id' and 'area' for each cell.
         """
         cellcut = self._read_cellcut_to_df(name)
         return cellcut[["cell_id", "area"]]
 
     def get_cell_borders(self, name: str, transformed: bool = True) -> pd.DataFrame:
         """
-        Returns the spatial information per cell.
+        Extract the spatial information per cell from a cellcut file.
 
-        Args:
-            name (str): File name.
-            transformed (bool, optional): If true, returns borders transformed. Defaults to True.
+        Parameters
+        ----------
+        name : str
+            The name of the cellcut file.
+        transformed : bool, optional
+            Whether or not to transform the cell's border data. If True,
+            each point in the border data will have the cell's x and y
+            values added to it. Default is True.
 
         Returns
         -------
-            pd.DataFrame: DataFrame with cell_id and borders (and x,y if not transformed).
+        pd.DataFrame
+            A DataFrame containing the cell's ID and its border data. If
+            'transformed' is False, the cell's x and y values are also included.
         """
         cellcut = self._read_cellcut_to_df(name)
 
         if transformed:
             cellcut["border"] = cellcut.apply(
-                lambda row: [[point[0] + row["x"], point[1] + row["y"]] for point in row["border"]]
-                if transformed
-                else row["border"],
-                axis=1,
+                lambda row: [[point[0] + row["x"], point[1] + row["y"]] for point in row["border"]], axis=1
             )
             return cellcut[["cell_id", "border"]]
-        else:
-            return cellcut[["cell_id", "x", "y", "border"]]
 
-    def get_genecounts_per_cell(self, name: str) -> anndata.AnnData:
-        """Returns the counts per gene per cell."""
+        return cellcut[["cell_id", "x", "y", "border"]]
+
+    def get_genecounts_per_cell(self, name: str) -> pd.DataFrame:
+        """
+        Retrieve the counts per gene per cell.
+
+        Parameters
+        ----------
+        name : str
+            The name of the .gef file.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame sorted by 'cell_id' and 'gene', containing genes,
+            cell IDs and corresponding gene counts. Columns are 'gene',
+            'cell_id' and 'counts'.
+        """
         h5 = _get_h5_from_gef(
             result_path=self.result_dir,
             folder_name="041.cellcut",
             file_name=name,
         )
 
-        gene_data = h5["cellBin"]["gene"][:]
-        geneExp_data = h5["cellBin"]["geneExp"][:]
+        gene_info = h5["cellBin"]["gene"][:]
+        gene_expression_info = h5["cellBin"]["geneExp"][:]
+
+        cell_ids = gene_expression_info["cellID"]
+        counts = gene_expression_info["count"]
 
         # Extract which probes were found in which cells
         probe_df = pd.DataFrame()
-        gene_list = [
-            name.decode() for name, cell_count in gene_data[["geneName", "cellCount"]] for _ in range(cell_count)
+        probe_df["genes"] = [
+            name.decode() for name, cell_count in gene_info[["geneName", "cellCount"]] for _ in range(cell_count)
         ]
-        probe_df["genes"] = gene_list
-        probe_df["cellID"] = geneExp_data["cellID"]
-        probe_df["counts"] = geneExp_data["count"]
+        probe_df["cellID"] = cell_ids
+        probe_df["counts"] = counts
 
-        probe_df = probe_df.rename(columns={"genes": "gene", "cellID": "cell_id"})
-
-        return probe_df.sort_values(["cell_id", "gene"]).reset_index(drop=True)
+        return (
+            probe_df.rename(columns={"genes": "gene", "cellID": "cell_id"})
+            .sort_values(["cell_id", "gene"])
+            .reset_index(drop=True)
+        )
 
     def read_cellcut(self, name: str) -> anndata.AnnData:
-        """Returns the cellcut file."""
+        """
+        Read a cellcut file and return an AnnData object.
+
+        Parameters
+        ----------
+        name : str
+            The name of the cellcut file.
+
+        Returns
+        -------
+        anndata.AnnData
+            An AnnData object containing cellcut data. The `.obs_names` attribute
+            is set to the 'id' field from the cellcut data, and the `.var_names`
+            attribute is set to the names of the cellcut data fields.
+        """
+        # Get the h5 file from the gef result directory
         h5 = _get_h5_from_gef(
             result_path=self.result_dir,
             folder_name="041.cellcut",
@@ -124,28 +184,34 @@ class GEF:
         )
 
         cell_data = h5["cellBin"]["cell"][:]
-        cellBorder_data = h5["cellBin"]["cellBorder"][:]
+        cell_border_data = h5["cellBin"]["cellBorder"][:]
 
-        tmp = {}
-        names = list(cell_data.dtype.names)
-        names.remove("id")
-        for name in names:
-            tmp[name] = cell_data[name]
+        # Prepare a dictionary to create DataFrame
+        cellcut_data_dict = {name: cell_data[name] for name in cell_data.dtype.names if name != "id"}
 
-        cellcut_df = pd.DataFrame(tmp, columns=names)
+        cellcut_data_dict["border"] = [border[~np.all(border == [32767, 32767], axis=1)] for border in cell_border_data]
+        cellcut_df = pd.DataFrame(cellcut_data_dict)
+        cellcut_df.index = cell_data["id"].astype(str)
 
-        # truncate border points
-        cellcut_df["border"] = [border[~np.all(border == [32767, 32767], axis=1)] for border in cellBorder_data]
-        names += ["border"]
-
-        cellcut_adata = anndata.AnnData(X=cellcut_df.values)
-        cellcut_adata.obs_names = [str(i) for i in cell_data["id"]]
-        cellcut_adata.var_names = names
-
-        return cellcut_adata
+        return anndata.AnnData(cellcut_df)
 
     def get_genecounts_per_spot(self, name: str, binsize: int = 100) -> pd.DataFrame:
-        """Returns the counts per bin around (x/y)."""
+        """
+        Calculate gene counts per specified bin size around a spot (x/y).
+
+        Parameters
+        ----------
+        name : str
+            The name of the gene expression file.
+        binsize : int, optional
+            The size of the bin for which the gene counts are calculated. Defaults to 100.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame containing x, y coordinates, gene, and corresponding counts,
+            sorted by x, y and gene.
+        """
         h5 = _get_h5_from_gef(
             result_path=self.result_dir,
             folder_name="04.tissuecut",
@@ -163,19 +229,36 @@ class GEF:
 
         return result.sort_values(["x", "y", "gene"]).reset_index(drop=True)
 
-    def get_gene_stats(self, name: str) -> pd.DataFrame:
-        """Returns the counts per bin around (x/y)."""
-        h5 = _get_h5_from_gef(
+    def get_gene_stats(self, gene_name: str) -> pd.DataFrame:
+        """
+        Retrieve gene statistics from a HDF5 file and return it as a sorted DataFrame.
+
+        Parameters
+        ----------
+        gene_name : str
+            Name of the gene file.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame containing gene statistics. Columns include 'gene', 'MIDcount',
+            and 'E10'. The DataFrame is sorted in descending order by 'MIDcount' column
+            and the index is reset.
+        """
+        h5 = self._get_h5_from_gef(
             result_path=self.result_dir,
             folder_name="04.tissuecut",
-            file_name=name,
+            file_name=gene_name,
         )
 
-        stat_data = h5["stat"]["gene"][:]
+        gene_stat_data = h5["stat"]["gene"][:]
 
-        result = pd.DataFrame()
-        result["gene"] = [gene.decode() for gene in stat_data["gene"]]
-        result["MIDcount"] = stat_data["MIDcount"]
-        result["E10"] = stat_data["E10"]
+        gene_stats_df = pd.DataFrame(
+            {
+                "gene": [gene.decode() for gene in gene_stat_data["gene"]],
+                "MIDcount": gene_stat_data["MIDcount"],
+                "E10": gene_stat_data["E10"],
+            }
+        )
 
-        return result.sort_values("MIDcount", ascending=False).reset_index(drop=True)
+        return gene_stats_df.sort_values(by="MIDcount", ascending=False).reset_index(drop=True)

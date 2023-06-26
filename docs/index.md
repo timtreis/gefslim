@@ -4,7 +4,7 @@
 
 ```{toctree}
 :hidden: true
-:maxdepth: 1
+:maxdepth: 2
 
 api.md
 changelog.md
@@ -12,5 +12,5 @@ template_usage.md
 contributing.md
 references.md
 
-notebooks/example
+notebooks/gefslim
 ```

@@ -13,3 +13,15 @@ and this project adheres to [Semantic Versioning][].
 ### Added
 
 -   Basic tool, preprocessing and plotting functions
+
+## 0.1.1 - 2023-07-17
+
+### Added
+
+-   bugfixes
+
+## 0.1.0 - 2023-06-27
+
+### Added
+
+-   Initial release

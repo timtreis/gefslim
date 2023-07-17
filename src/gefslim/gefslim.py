@@ -229,13 +229,13 @@ class GEF:
 
         return result.sort_values(["x", "y", "gene"]).reset_index(drop=True)
 
-    def get_gene_stats(self, gene_name: str) -> pd.DataFrame:
+    def get_gene_stats(self, name: str) -> pd.DataFrame:
         """
         Retrieve gene statistics from a HDF5 file and return it as a sorted DataFrame.
 
         Parameters
         ----------
-        gene_name : str
+        name : str
             Name of the gene file.
 
         Returns
@@ -245,10 +245,10 @@ class GEF:
             and 'E10'. The DataFrame is sorted in descending order by 'MIDcount' column
             and the index is reset.
         """
-        h5 = self._get_h5_from_gef(
+        h5 = _get_h5_from_gef(
             result_path=self.result_dir,
             folder_name="04.tissuecut",
-            file_name=gene_name,
+            file_name=name,
         )
 
         gene_stat_data = h5["stat"]["gene"][:]

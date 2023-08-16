@@ -1,7 +1,7 @@
 {
   "template": "https://github.com/scverse/cookiecutter-scverse",
-  "commit": "b8741de1bd22be6472a9884276d6b751dfd22a4c",
-  "checkout": null,
+  "commit": "605f95714130c960bce12eab98a4e023e8932249",
+  "checkout": "v0.2.22",
   "context": {
     "cookiecutter": {
       "project_name": "gefslim",
